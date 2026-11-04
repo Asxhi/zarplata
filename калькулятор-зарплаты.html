@@ -203,8 +203,9 @@ const ids = Object.keys(DEF);
 const KEY = "paycalc-v1";
 
 /* localStorage может быть недоступен (file:// в Firefox, приватный режим) — не роняем калькулятор */
-function lsGet(){ try{ return localStorage.getItem(KEY); }catch(e){ return null; } }
-function lsSet(v){ try{ localStorage.setItem(KEY, v); }catch(e){} }
+const MEM = {};  // резерв, если localStorage недоступен (file:// в Firefox и т.п.)
+function lsGet(){ try{ return localStorage.getItem(KEY); }catch(e){ return MEM[KEY]||null; } }
+function lsSet(v){ try{ localStorage.setItem(KEY, v); }catch(e){ MEM[KEY]=v; } }
 
 function load(){
   try{ return Object.assign({}, DEF, JSON.parse(lsGet()||"{}")); }
