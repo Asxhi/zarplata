@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Калькулятор зарплаты
+Comment=Сколько теряешь на отгулах и что получишь на руки
+Exec=bash -c "cd $(dirname %k) && ./start_paycalc.sh"
+Icon=accessories-calculator
+Terminal=false
+Categories=Office;Finance;

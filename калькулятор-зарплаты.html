@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Калькулятор зарплаты с отгулами</title>
+<style>
+  :root{
+    --bg:#0f1420; --card:#1a2233; --card2:#212c42; --line:#2e3b57;
+    --text:#e8edf6; --muted:#8fa0bd; --accent:#4da3ff; --good:#3ecf8e; --bad:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+       background:var(--bg);color:var(--text);padding:16px}
+  .wrap{max-width:1000px;margin:0 auto}
+  h1{font-size:22px;margin:6px 0 2px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:16px;line-height:1.5}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .card h2{font-size:14px;margin:0 0 10px;color:var(--accent);text-transform:uppercase;letter-spacing:.5px}
+  label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+  input[type=number],select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);
+      background:var(--card2);color:var(--text);font-size:16px;outline:none}
+  input[type=number]:focus,select:focus{border-color:var(--accent)}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.45}
+  .row{display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;
+       border-bottom:1px dashed var(--line);font-size:14px;gap:10px}
+  .row:last-child{border-bottom:none}
+  .row .val{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .pos{color:var(--good)} .neg{color:var(--bad)} .neu{color:var(--text)}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{color:var(--muted);font-weight:500;text-align:right;padding:6px 8px;border-bottom:1px solid var(--line);font-size:12px}
+  th:first-child,td:first-child{text-align:left}
+  td{text-align:right;padding:8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+  tr:last-child td{border-bottom:none}
+  .total td{font-weight:700;border-top:2px solid var(--line)}
+  .full{grid-column:1/-1}
+  .formula{background:var(--card2);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--muted);
+           margin-top:10px;line-height:1.5}
+  .big{font-size:28px;font-weight:800;margin:2px 0 8px}
+  .result-main{font-size:32px;font-weight:800;color:var(--good);margin:2px 0 8px}
+  button.linklike{background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;
+                  padding:4px 0 0;text-decoration:underline;display:block}
+  .switch{display:flex;align-items:center;gap:8px;margin:10px 0 2px;font-size:13px;color:var(--muted)}
+  .switch input{width:auto;margin:0}
+  @media (max-width:640px){ .big{font-size:22px} .result-main{font-size:24px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>💸 Калькулятор зарплаты с отгулами</h1>
+  <div class="sub">
+    Аванс — <b>20 числа</b> (в него входит премия 20%), зарплата — <b>5 числа</b>.<br>
+    Напишите, сколько отгулов взяли, — и сразу видно, сколько теряете и что получите на руки.
+    Все значения сохраняются в браузере.
+  </div>
+
+  <div class="grid">
+
+    <!-- ДАННЫЕ МЕСЯЦА -->
+    <div class="card">
+      <h2>📅 Расчётный месяц</h2>
+      <label>Год</label>
+      <input type="number" id="year" min="2000" max="2100" step="1">
+      <label>Месяц</label>
+      <select id="month"></select>
+      <div class="hint">Рабочих дней по календарю: <b id="wdInfo">—</b></div>
+
+      <label>Отгулов взял, дней</label>
+      <input type="number" id="otg" min="0" step="0.5">
+      <div class="hint">Можно дробно: 0.5 = полдня.</div>
+
+      <label>Больничных дней (если были)</label>
+      <input type="number" id="sick" min="0" step="0.5">
+      <div class="hint">Саму оплату больничного калькулятор не считает, но из оклада он «съедает» день так же, как отгул.</div>
+
+      <label>Дополнительные вычеты из выплаты 5 числа, ₽</label>
+      <input type="number" id="extraDeduct" step="100">
+      <div class="hint">Например, перерасчёты, удержания и т.п.</div>
+    </div>
+
+    <!-- НАСТРОЙКИ -->
+    <div class="card">
+      <h2>⚙️ Настройки</h2>
+      <label>Оклад, ₽</label>
+      <input type="number" id="salary" step="1000">
+      <label>Премия, % от оклада (входит в аванс 20 числа)</label>
+      <input type="number" id="bonusPct" step="1">
+
+      <div class="switch">
+        <input type="checkbox" id="harmFixed">
+        <span>Вредность — фиксированная сумма в месяц (не зависит от отгулов)</span>
+      </div>
+      <label>Надбавка за вредность, ₽/день</label>
+      <input type="number" id="harmPerDay" step="0.01">
+      <button class="linklike" id="recalcHarm">Пересчитать по расчётным листам (авг/сен)</button>
+      <div class="hint">
+        По вашим данным: 1896 ₽ / 14 дней ≈ 135.4 ₽/день, 3005 ₽ / 22 дня ≈ 136.6 ₽/день →
+        средневзвешенно <b>≈ 136 ₽/день</b>. Похоже на фиксированный % от оклада за работу
+        во вредных условиях (~0.17% оклада за день).
+      </div>
+
+      <label style="margin-top:12px">Рабочих дней в месяце</label>
+      <select id="workdaysSel">
+        <option value="auto">Авто: производственный календарь РФ</option>
+        <option value="manual">Задать вручную</option>
+      </select>
+      <div id="manualWDWrap" style="display:none">
+        <label>Количество рабочих дней</label>
+        <input type="number" id="workdaysManual" min="1" max="31" step="1">
+      </div>
+    </div>
+
+    <!-- СТОИМОСТЬ ОТГУЛА -->
+    <div class="card">
+      <h2>🧮 Сколько стоит один отгул</h2>
+      <div class="big neg" id="costPerDay">—</div>
+      <div class="row"><span>Оклад за 1 рабочий день</span><span class="val" id="okladDay">—</span></div>
+      <div class="row"><span>Премия за 1 день (<span id="bonusPctLbl">20</span>%)</span><span class="val" id="bonusDay">—</span></div>
+      <div class="row"><span>Вредность за 1 день</span><span class="val" id="harmDay">—</span></div>
+      <div class="row"><span>Экономия на НДФЛ (налог с невыплаченного)</span><span class="val pos" id="taxBack">—</span></div>
+      <div class="formula" id="formulaTxt"></div>
+    </div>
+
+    <!-- ИТОГ -->
+    <div class="card">
+      <h2>💰 Что получится в этом месяце</h2>
+      <label>Итого на руки за месяц</label>
+      <div class="result-main" id="netTotal">—</div>
+      <div class="row"><span>Потери из-за отсутствия (<span id="absentLbl">0</span> дн.)</span><span class="val neg" id="lossTotal">—</span></div>
+      <div class="row"><span>Если бы отгулов не было</span><span class="val neu" id="netNoLoss">—</span></div>
+      <div class="row"><span>Аванс 20 числа (на руки)</span><span class="val" id="advNet">—</span></div>
+      <div class="row"><span>Зарплата 5 числа (на руки)</span><span class="val" id="salNet">—</span></div>
+      <div class="formula">«Если бы отгулов не было» — тот же месяц при полной отработке и без доп. вычетов.</div>
+    </div>
+
+    <!-- ТАБЛИЦА -->
+    <div class="card full">
+      <h2>📆 Детализация</h2>
+      <table>
+        <thead>
+          <tr><th>Статья</th><th>Было бы (без отгулов)</th><th>Факт</th><th>Δ Потеря</th></tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="hint" style="margin-top:10px">
+        Модель выплат: <b>аванс 20 числа</b> = доля оклада + вся премия (премия считается от фактически
+        отработанного); <b>зарплата 5 числа</b> = остаток оклада + надбавка за вредность − НДФЛ − доп. вычеты.
+        Если бухгалтерия делит иначе — поменяйте долю аванса ниже.
+      </div>
+      <div class="grid" style="margin-top:6px">
+        <div>
+          <label>Доля оклада в авансе, %</label>
+          <input type="number" id="advShare" min="0" max="100" step="5">
+        </div>
+        <div>
+          <label>НДФЛ, %</label>
+          <input type="number" id="ndfl" min="0" max="50" step="1">
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <div class="sub" style="margin-top:14px">
+    ⚠️ Оценка приблизительная: точные суммы зависят от политики компании (пересчитывается ли премия,
+    фиксируется ли вредность, как именно режут аванс).
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ---------- производственный календарь РФ (пятидневка, упрощённо) ---------- */
+const HOLIDAYS = { // нерабочие праздничные дни, ст. 112 ТК РФ
+  2024:["01-01","01-02","01-03","01-04","01-05","01-06","01-07","01-08","02-23","03-08","05-01","05-09","06-12","11-04"],
+  2025:["01-01","01-02","01-03","01-04","01-05","01-06","01-07","01-08","02-23","03-08","05-01","05-09","06-12","11-04"],
+  2026:["01-01","01-02","01-03","01-04","01-05","01-06","01-07","01-08","02-23","03-08","05-01","05-09","06-12","11-04"],
+  2027:["01-01","01-02","01-03","01-04","01-05","01-06","01-07","01-08","02-23","03-08","05-01","05-09","06-12","11-04"]
+};
+function workdaysInMonth(year, monthIdx){
+  const hol = new Set(HOLIDAYS[year] || []);
+  const last = new Date(year, monthIdx+1, 0).getDate();
+  let n = 0;
+  for(let day=1; day<=last; day++){
+    const wd = new Date(year, monthIdx, day).getDay();
+    const key = String(monthIdx+1).padStart(2,"0") + "-" + String(day).padStart(2,"0");
+    if(wd!==0 && wd!==6 && !hol.has(key)) n++;
+  }
+  return n;
+}
+
+const MONTHS = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
+const $ = id => document.getElementById(id);
+const fmt = (x,d=2) => Number(x||0).toLocaleString("ru-RU",{minimumFractionDigits:d,maximumFractionDigits:d}) + " ₽";
+
+/* ---------- состояние ---------- */
+const DEF = {
+  salary:79000, bonusPct:20, harmPerDay:136.01, harmFixed:false,
+  year:2026, month:String(new Date().getMonth()), otg:0, sick:0, extraDeduct:0,
+  workdaysSel:"auto", workdaysManual:22, advShare:50, ndfl:13
+};
+const ids = Object.keys(DEF);
+const KEY = "paycalc-v1";
+
+/* localStorage может быть недоступен (file:// в Firefox, приватный режим) — не роняем калькулятор */
+const MEM = {};  // резерв, если localStorage недоступен (file:// в Firefox и т.п.)
+function lsGet(){ try{ return localStorage.getItem(KEY); }catch(e){ return MEM[KEY]||null; } }
+function lsSet(v){ try{ localStorage.setItem(KEY, v); }catch(e){ MEM[KEY]=v; } }
+
+function load(){
+  try{ return Object.assign({}, DEF, JSON.parse(lsGet()||"{}")); }
+  catch(e){ return Object.assign({}, DEF); }
+}
+function save(){
+  const st={};
+  ids.forEach(k=>{
+    const el=$(k);
+    st[k] = el.type==="checkbox" ? el.checked : el.value;
+  });
+  lsSet(JSON.stringify(st));
+}
+
+function calc(){
+  const oklad   = +$("salary").value || 0;
+  const bPct    = (+$("bonusPct").value || 0)/100;
+  const harmPd  = +$("harmPerDay").value || 0;
+  const harmFix = $("harmFixed").checked;
+  const WD      = $("workdaysSel").value==="manual"
+                    ? Math.max(1, +$("workdaysManual").value || 1)
+                    : workdaysInMonth(+$("year").value, +$("month").value);
+  const otg     = Math.max(0, +$("otg").value || 0);
+  const sick    = Math.max(0, +$("sick").value || 0);
+  const extra   = +$("extraDeduct").value || 0;
+  const advSh   = Math.min(Math.max((+$("advShare").value||0)/100,0),1);
+  const ndfl    = Math.min(Math.max((+$("ndfl").value||0)/100,0),1);
+
+  const absent = Math.min(otg+sick, WD);
+  const worked = Math.max(WD-absent, 0);
+
+  $("wdInfo").textContent = WD + " дн. (" + MONTHS[+$("month").value] + " " + $("year").value + ")";
+  $("bonusPctLbl").textContent = ($("bonusPct").value||0);
+  $("absentLbl").textContent = absent;
+
+  /* стоимость одного дня отсутствия (на руки) */
+  const okladDay = oklad / WD;
+  const bonusDay = okladDay * bPct;
+  const harmDayEff = harmFix ? 0 : harmPd;      // фиксированная вредность от отгулов не уменьшается
+  const grossDay = okladDay + bonusDay + harmDayEff;
+  const netDay   = grossDay * (1 - ndfl);
+  $("okladDay").textContent = fmt(okladDay);
+  $("bonusDay").textContent = fmt(bonusDay);
+  $("harmDay").textContent  = harmFix ? "0 ₽ (фикс.)" : fmt(harmPd);
+  $("taxBack").textContent  = "−" + fmt(grossDay*ndfl);
+  $("costPerDay").textContent = fmt(netDay);
+  $("formulaTxt").innerHTML =
+    "(" + fmt(oklad,0) + " / " + WD + " × " + (1+bPct).toFixed(2) +
+    (harmFix ? "" : " + " + fmt(harmPd)) + ") × (1 − " + ($("ndfl").value||0) + "%) ≈ <b>" + fmt(netDay) +
+    "</b> за 1 день отгула на руки";
+
+  /* сценарии: факт и «без отгулов» */
+  function scenario(daysWorked, extraAmt){
+    const okladGross = oklad * (daysWorked/WD);
+    const bonusGross = okladGross * bPct;
+    const harmFinal  = harmFix ? (daysWorked>0 ? harmPd*WD : 0) : harmPd*daysWorked;
+    const gross = okladGross + bonusGross + harmFinal - extraAmt;
+    const tax   = Math.max(gross,0) * ndfl;
+    const net   = Math.max(gross,0) - tax;
+    const advGross = okladGross*advSh + bonusGross;
+    const salGross = okladGross*(1-advSh) + harmFinal - extraAmt;
+    const salNet   = Math.max(salGross - tax, 0);
+    const advNet   = net - salNet;   // остаток условно показываем как аванс 20 числа
+    return {okladGross, bonusGross, harm:harmFinal, gross, tax, net, advGross, advNet, salGross, salNet};
+  }
+  const P  = scenario(worked, extra);
+  const PF = scenario(WD, 0);
+
+  const loss = PF.net - P.net;
+  $("netTotal").textContent   = fmt(P.net);
+  $("lossTotal").textContent  = "−" + fmt(loss);
+  $("netNoLoss").textContent  = fmt(PF.net);
+  $("advNet").textContent     = fmt(P.advNet);
+  $("salNet").textContent     = fmt(P.salNet);
+
+  const rows = [
+    ["Оклад (" + worked + " из " + WD + " дн.)", PF.okladGross, P.okladGross],
+    ["Премия " + ($("bonusPct").value||0) + "%", PF.bonusGross, P.bonusGross],
+    ["Надбавка за вредность" + (harmFix ? " (фикс.)" : " (" + worked + " дн.)"), PF.harm, P.harm],
+    ["Доп. вычеты", 0, -extra],
+    ["НДФЛ " + ($("ndfl").value||0) + "%", -PF.tax, -P.tax],
+  ];
+  let html = "";
+  rows.forEach(r=>{
+    const d = r[2]-r[1];
+    const cls = d<-0.005 ? "neg" : d>0.005 ? "pos" : "neu";
+    html += "<tr><td>"+r[0]+"</td><td>"+fmt(r[1])+"</td><td>"+fmt(r[2])+"</td><td class='"+cls+"'>"+(Math.abs(d)<0.005?"—":fmt(d))+"</td></tr>";
+  });
+  html += "<tr><td>Аванс 20 числа (на руки)</td><td>"+fmt(PF.advNet)+"</td><td>"+fmt(P.advNet)+"</td><td class='"+(P.advNet-PF.advNet<-0.005?"neg":"neu")+"'>"+fmt(P.advNet-PF.advNet)+"</td></tr>";
+  html += "<tr><td>Зарплата 5 числа (на руки)</td><td>"+fmt(PF.salNet)+"</td><td>"+fmt(P.salNet)+"</td><td class='"+(P.salNet-PF.salNet<-0.005?"neg":"neu")+"'>"+fmt(P.salNet-PF.salNet)+"</td></tr>";
+  html += "<tr class='total'><td>Итого на руки</td><td>"+fmt(PF.net)+"</td><td>"+fmt(P.net)+"</td><td class='neg'>−"+fmt(loss)+"</td></tr>";
+  $("tbody").innerHTML = html;
+
+  save();
+}
+
+/* ---------- инициализация ---------- */
+(function init(){
+  const st = load();
+  const msel = $("month");
+  MONTHS.forEach((m,i)=>{
+    const o = document.createElement("option");
+    o.value = i; o.textContent = m;
+    msel.appendChild(o);
+  });
+
+  ids.forEach(k=>{
+    const el = $(k);
+    if(!el) return;
+    if(el.type==="checkbox") el.checked = !!st[k];
+    else el.value = st[k];
+  });
+  $("manualWDWrap").style.display = $("workdaysSel").value==="manual" ? "block" : "none";
+
+  $("workdaysSel").addEventListener("change", e=>{
+    $("manualWDWrap").style.display = e.target.value==="manual" ? "block" : "none";
+    calc();
+  });
+
+  $("recalcHarm").addEventListener("click", ()=>{
+    const v = (1896+3005)/(14+22);   // всего выплат по вредности / всего рабочих дней
+    $("harmPerDay").value = v.toFixed(2);
+    calc();
+  });
+
+  ids.forEach(k=>{
+    const el = $(k);
+    if(!el) return;
+    el.addEventListener("input", calc);
+    el.addEventListener("change", calc);
+  });
+
+  calc();
+})();
+</script>
+</body>
+</html>
